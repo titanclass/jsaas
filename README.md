@@ -6,14 +6,12 @@ An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine 
 
 ## Getting Started
 
+Using [Docker](https://www.docker.com/), start the service (be sure to replace <version> below):
+
 > You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
 
-> The following assumes you have [Docker](https://www.docker.com/) installed.
-
-Using [Docker](https://www.docker.com/), start the service:
-
 ```bash
-docker run -e JSAAS_BIND_ADDR=0.0.0.0:9412 -p 9412:9412 --rm -ti titanclass/jsaas:0.1.0
+docker run -e JSAAS_BIND_ADDR=0.0.0.0:9412 -p 9412:9412 --rm -ti titanclass/jsaas:<version>
 ```
 
 Define a program that adds two numbers:
