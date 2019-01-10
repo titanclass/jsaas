@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -e
+
+# This script downloads, extracts, and configures
+# Duktape. It's invoked by build.rs using Cargo's
+# build script functionality. The bindgen and cc
+# crates then take care of compiling this code
+# and generating Rust bindings.
+
+hash curl python2
+
+# Cargo will display stderr output if this script fails,
+# so redirect everything there.
+exec 1>&2
+
+if [ "$#" != 2 ]; then
+  echo "usage: $0 <duktape-version> <output-dir>"
+  exit 1
+fi
+
+version="$1"; shift
+output_dir="$1"; shift
+url="https://duktape.org/duktape-$version.tar.xz"
+
+rm -rf "$output_dir"
+mkdir -p "$output_dir"
+
+curl -s "$url" | tar xf - --strip-components=1 -J -C "$output_dir"
+
+# The program uses a customized duktape that can invoke
+# a timeout function per-heap to prevent e.g. while(true) {}
+# from hanging a thread.
+cat << EOT >> "$output_dir/duktape-config.yaml"
+DUK_USE_INTERRUPT_COUNTER: true
+DUK_USE_EXEC_TIMEOUT_CHECK:
+  verbatim: |
+    extern duk_bool_t jsaas_duk_exec_timeout_check(void *udata);
+    #define DUK_USE_EXEC_TIMEOUT_CHECK(udata) jsaas_duk_exec_timeout_check(udata)
+EOT
+
+python2 "$output_dir/tools/configure.py" --output-directory "$output_dir/duktape-src" --option-file "$output_dir/duktape-config.yaml"

@@ -1,0 +1,86 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/project
+    docker:
+      - image: circleci/rust:latest
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y build-essential clang curl libclang-dev musl-dev musl-tools python python-yaml
+            rustup target add x86_64-unknown-linux-musl
+      - restore_cache:
+          key: cargo-cache-1
+      - run:
+          name: Add rustmt
+          command: |
+            rustup component add rustfmt-preview
+      - run:
+          name: Ensure source code is formatted
+          command: |
+            cargo fmt && git diff --quiet
+      - run:
+          name: Build & Test
+          command: |
+            cargo build --release
+            cargo test --release --no-fail-fast
+            cargo test --release --no-fail-fast -- --nocapture --ignored
+            cargo build --release --target=x86_64-unknown-linux-musl
+            cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast
+            cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast -- --nocapture --ignored
+      - save_cache:
+          key: cargo-cache-1
+          paths:
+          - "~/.cargo"
+
+  publish:
+    working_directory: ~/project
+    docker:
+      - image: circleci/rust:latest
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Install Dependencies
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y build-essential clang curl libclang-dev musl-dev musl-tools python python-yaml
+            rustup target add x86_64-unknown-linux-musl
+      - restore_cache:
+          key: cargo-cache-1
+      - run:
+          name: Build & Test
+          command: |
+            cargo build --release --target=x86_64-unknown-linux-musl
+            cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast
+            cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast -- --nocapture --ignored
+      - run:
+          name: Docker Publish
+          command: |
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            version=$(git describe --tags | sed -E 's/^v//')
+            docker build -t "titanclass/jsaas:$version" .
+            docker push "titanclass/jsaas:$version"
+      - save_cache:
+          key: cargo-cache-1
+          paths:
+          - "~/.cargo"
+
+workflows:
+  version: 2
+
+  build:
+    jobs:
+      - build
+
+  publish:
+    jobs:
+      - publish:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
