@@ -1,11 +1,46 @@
 # JSaaS
 
-*Currently at the POC stage, i.e. only proving that invoking Duktape from Rust is easy enough.*
-
 ## Overview
 
-An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine
-to safely execute JavaScript in a sandboxed environment.
+An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine to safely execute JavaScript in a sandboxed environment.
+
+## Getting Started
+
+> You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
+
+> The following assumes you have [Docker](https://www.docker.com/) installed.
+
+Using [Docker](https://www.docker.com/), start the service:
+
+```bash
+docker run -e JSAAS_BIND_ADDR=0.0.0.0:9412 -p 9412:9412 --rm -ti titanclass/jsaas:0.1.0
+```
+
+Define a program that adds two numbers:
+
+```bash
+curl -XPOST --data 'function(a, b) { return a + b; }' http://localhost:9412/scripts
+```
+
+which yields:
+
+```
+{"id":"af15791e-e9c1-4750-8a44-60222ef88c7c"}
+```
+
+Next, execute the program by supplying the numbers:
+
+```bash
+curl -XPOST --data '[4, 5]' http://localhost:9412/scripts/af15791e-e9c1-4750-8a44-60222ef88c7c
+```
+
+which yields:
+
+```
+9
+```
+
+In a real-world scenario, you can also return a JS object or any other JSON-serializable value.
 
 ## Configuration
 
@@ -20,46 +55,6 @@ JSaaS is configured through environment variables. See the following table for a
 | JSAAS_TLS_BIND_ADDR                     | If specified, and TLS is configured, a separate port will be bound for TLS instead of using the default one.   |
 | JSAAS_TLS_PUBLIC_CERTIFICATE_PATH       | TLS public key path, PEM format. Note that TLS is currently only supported on Linux.                           |
 | JSAAS_TLS_PRIVATE_KEY_PATH              | TLS private key path, PEM format. Note that TLS is currently only supported on Linux.                          |
-
-## Usage
-
-```bash
-cargo run --release
-
-~/work/jsaas#finish-program $ curl -i -XPOST --data 'function(a, b) { return a * b * 2; }' http://127.0.0.1:3000/scripts
-HTTP/1.1 201 Created
-content-type: application/json
-location: /scripts/b3bca5f8-d6e8-4a11-8170-8fb238e3a216
-content-length: 45
-date: Sat, 05 Jan 2019 02:11:00 GMT
-
-{"id":"b3bca5f8-d6e8-4a11-8170-8fb238e3a216"}-> 0
-
-~/work/jsaas#finish-program $ curl -i -XPOST --data '[1, 2]' http://127.0.0.1:3000/scripts/b3bca5f8-d6e8-4a11-8170-8fb238e3a216
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: 1
-date: Sat, 05 Jan 2019 02:11:36 GMT
-
-4-> 0
-
-~/work/jsaas#finish-program $ curl -i -XPOST --data 'function(a, b) { return { sum:  a + b } }' http://127.0.0.1:3000/scripts
-HTTP/1.1 201 Created
-content-type: application/json
-location: /scripts/c6608297-fdd7-4116-828c-a23c255f7995
-content-length: 45
-date: Sat, 05 Jan 2019 02:12:34 GMT
-
-{"id":"c6608297-fdd7-4116-828c-a23c255f7995"}-> 0
-
-~/work/jsaas#finish-program $ curl -i -XPOST --data '[8, 32]' http://127.0.0.1:3000/scripts/c6608297-fdd7-4116-828c-a23c255f7995
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: 10
-date: Sat, 05 Jan 2019 02:12:48 GMT
-
-{"sum":40}-> 0
-```
 
 ## Development
 
@@ -92,8 +87,8 @@ A webserver can be started for development:
 cargo run
 ```
 
-(TBD)
-
 ## Releasing
 
-(TBD)
+To release, push a tag that starts with "v" -- e.g. "v0.2.0" -- and CircleCI will build the project and push an image to DockerHub.
+
+(c)opyright 2019, Titan Class P/L
