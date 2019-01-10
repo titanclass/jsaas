@@ -6,7 +6,7 @@ An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine 
 
 ## Getting Started
 
-Using [Docker](https://www.docker.com/), start the service (be sure to replace <version> below):
+Using [Docker](https://www.docker.com/), start the service (be sure to replace &lt;version&gt; below):
 
 > You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
 
