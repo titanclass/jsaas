@@ -121,6 +121,37 @@ fn request_handler(
         } = rx.recv().unwrap();
 
         match (req_parts.method, req_parts.uri.path()) {
+            (Method::POST, "/execute") => match String::from_utf8(req_body.into_buf().collect()) {
+                Ok(script) => {
+                    pool.execute(move || {
+                        let result = json_eval(&script, "[]", script_execution_completion_time);
+
+                        let response = match result {
+                            Ok(json_body) => Response::builder()
+                                .header("Content-Type", "application/json")
+                                .body(Body::from(json_body))
+                                .unwrap(),
+
+                            Err(e) => Response::builder()
+                                .status(403)
+                                .body(Body::from(e.to_string()))
+                                .unwrap(),
+                        };
+
+                        sender.send(response).unwrap();
+                    });
+                }
+
+                Err(_) => {
+                    let response = Response::builder()
+                        .status(403)
+                        .body(Body::from("cannot extract script from request body"))
+                        .unwrap();
+
+                    sender.send(response).unwrap();
+                }
+            },
+
             (ref method, path)
                 if path.starts_with("/scripts/")
                     && path.len() > 9

@@ -56,6 +56,18 @@ fn test_jsaas() {
             .unwrap();
 
         assert_eq!(value, 12);
+
+        let value2 = client
+            .post("http://localhost:9412/execute")
+            .body("function() { return 2 + 2 * 2; }")
+            .send()
+            .unwrap()
+            .text()
+            .unwrap()
+            .parse::<i64>()
+            .unwrap();
+
+        assert_eq!(value2, 6);
     });
 }
 
