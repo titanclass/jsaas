@@ -10,6 +10,8 @@ Using [Docker](https://www.docker.com/), start the service (be sure to replace &
 
 > You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
 
+### Define and Execute
+
 ```bash
 docker run -e JSAAS_BIND_ADDR=0.0.0.0:9412 -p 9412:9412 --rm -ti titanclass/jsaas:<version>
 ```
@@ -39,6 +41,20 @@ which yields:
 ```
 
 In a real-world scenario, you can also return a JS object or any other JSON-serializable value.
+
+### Execute Once
+
+You can also supply a function to be evaluated in one request and immediately discarded.
+
+```bash
+curl -XPOST --data 'function() { return 8 * 2; }' http://localhost:9412/execute
+```
+
+which yields:
+
+```
+16
+```
 
 ## Configuration
 
