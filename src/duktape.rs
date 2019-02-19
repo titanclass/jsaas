@@ -39,6 +39,25 @@ extern "C" fn jsaas_duk_exec_timeout_check(udata: *mut c_void) -> duktape::duk_b
     }
 }
 
+extern "C" fn jsaas_btoa(ctx: *mut duktape::duk_context) -> duktape::duk_ret_t {
+    unsafe { duktape::duk_base64_encode(ctx, 0) };
+
+    1
+}
+
+extern "C" fn jsaas_atob(ctx: *mut duktape::duk_context) -> duktape::duk_ret_t {
+    unsafe {
+        duktape::duk_require_string(ctx, 0);
+        duktape::duk_base64_decode(ctx, 0);
+        duktape::duk_buffer_to_string(ctx, 0);
+    };
+
+    1
+}
+
+const GLOBAL_FN_BTOA: *const u8 = b"btoa\0" as *const u8;
+const GLOBAL_FN_ATOB: *const u8 = b"atob\0" as *const u8;
+
 struct EvaluateContext {
     limit: time::Duration,
     start: time::Instant,
@@ -63,6 +82,15 @@ impl Context {
                 None,
             )
         };
+
+        unsafe {
+            duktape::duk_push_global_object(ctx);
+            duktape::duk_push_c_function(ctx, Some(jsaas_btoa), 1);
+            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_BTOA as *const i8);
+            duktape::duk_push_c_function(ctx, Some(jsaas_atob), 1);
+            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_ATOB as *const i8);
+            duktape::duk_pop(ctx);
+        }
 
         if ctx.is_null() {
             Err(io::Error::new(
@@ -401,5 +429,60 @@ mod tests {
             )
             .unwrap();
         assert_eq!(r, "6");
+    }
+
+    #[test]
+    fn test_duktape_btoa() {
+        let mut ctx = Context::new().unwrap();
+
+        let r = ctx
+            .evaluate(
+                "
+                function() {
+                    return {
+                        string: btoa('hello'),
+                        number: btoa(1234),
+                        undefined: btoa(),
+                        undefinedExplicit: btoa(undefined),
+                        true: btoa(true),
+                        false: btoa(false),
+                        null: btoa(null),
+                        obj: btoa({ test: 42 })
+                    };
+                }
+            ",
+                "[]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+
+        assert_eq!(r, r#"{"string":"aGVsbG8=","number":"MTIzNA==","undefined":"dW5kZWZpbmVk","undefinedExplicit":"dW5kZWZpbmVk","true":"dHJ1ZQ==","false":"ZmFsc2U=","null":"bnVsbA==","obj":"W29iamVjdCBPYmplY3Rd"}"#);
+    }
+
+    #[test]
+    fn test_duktape_atob() {
+        let mut ctx = Context::new().unwrap();
+
+        let r = ctx
+            .evaluate(
+                "
+                function() {
+                    return atob(\"aGVsbG8=\");
+                }
+            ",
+                "[]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+
+        assert_eq!(r, "\"hello\"");
+
+        let r = ctx.evaluate(
+            "function() { return atob(1234); }",
+            "[]",
+            time::Duration::from_millis(5000),
+        );
+
+        assert!(r.is_err());
     }
 }
