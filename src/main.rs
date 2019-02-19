@@ -133,7 +133,7 @@ fn request_handler(
                                 .unwrap(),
 
                             Err(e) => Response::builder()
-                                .status(403)
+                                .status(400)
                                 .body(Body::from(e.to_string()))
                                 .unwrap(),
                         };
@@ -144,7 +144,7 @@ fn request_handler(
 
                 Err(_) => {
                     let response = Response::builder()
-                        .status(403)
+                        .status(400)
                         .body(Body::from("cannot extract script from request body"))
                         .unwrap();
 
@@ -183,7 +183,7 @@ fn request_handler(
                                                     .unwrap(),
 
                                                 Err(e) => Response::builder()
-                                                    .status(403)
+                                                    .status(400)
                                                     .body(Body::from(e.to_string()))
                                                     .unwrap(),
                                             };
@@ -194,7 +194,7 @@ fn request_handler(
 
                                     Err(_) => {
                                         let response = Response::builder()
-                                            .status(403)
+                                            .status(400)
                                             .body(Body::from(
                                                 "cannot extract arguments from request body",
                                             ))
@@ -260,7 +260,7 @@ fn request_handler(
 
                     Err(_) => {
                         let response = Response::builder()
-                            .status(403)
+                            .status(400)
                             .body(Body::from("cannot extract script from request body"))
                             .unwrap();
 
