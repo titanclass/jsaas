@@ -88,106 +88,112 @@ impl Settings {
     }
 }
 
-#[test]
-fn test_settings_default() {
-    let settings = Settings::new(
-        "JSAAS_TEST_1_BIND_ADDR",
-        "JSAAS_TEST_1_SCRIPT_DEFINITION_EXPIRATION_TIME",
-        "JSAAS_TEST_1_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
-        "JSAAS_TEST_1_SCRIPT_EXECUTION_COMPLETION_TIME",
-        "JSAAS_TEST_1_TLS_BIND_ADDR",
-        "JSAAS_TEST_1_TLS_PUBLIC_CERTIFICATE_PATH",
-        "JSAAS_TEST_1_TLS_PRIVATE_KEY_PATH",
-    )
-    .unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env, time};
 
-    assert_eq!(
-        settings.bind_addr,
-        "127.0.0.1:9412".parse::<net::SocketAddr>().unwrap()
-    );
-    assert_eq!(
-        settings.script_definition_expiration_time,
-        time::Duration::from_secs(86400)
-    );
-    assert_eq!(
-        settings.script_execution_completion_time,
-        time::Duration::from_secs(10)
-    );
-    assert!(settings.script_execution_thread_pool_size > 0);
+    #[test]
+    fn test_settings_default() {
+        let settings = Settings::new(
+            "JSAAS_TEST_1_BIND_ADDR",
+            "JSAAS_TEST_1_SCRIPT_DEFINITION_EXPIRATION_TIME",
+            "JSAAS_TEST_1_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
+            "JSAAS_TEST_1_SCRIPT_EXECUTION_COMPLETION_TIME",
+            "JSAAS_TEST_1_TLS_BIND_ADDR",
+            "JSAAS_TEST_1_TLS_PUBLIC_CERTIFICATE_PATH",
+            "JSAAS_TEST_1_TLS_PRIVATE_KEY_PATH",
+        )
+        .unwrap();
 
-    assert_eq!(settings.tls_bind_addr, None);
+        assert_eq!(
+            settings.bind_addr,
+            "127.0.0.1:9412".parse::<net::SocketAddr>().unwrap()
+        );
+        assert_eq!(
+            settings.script_definition_expiration_time,
+            time::Duration::from_secs(86400)
+        );
+        assert_eq!(
+            settings.script_execution_completion_time,
+            time::Duration::from_secs(10)
+        );
+        assert!(settings.script_execution_thread_pool_size > 0);
 
-    assert_eq!(settings.tls_public_certificate_path, None);
+        assert_eq!(settings.tls_bind_addr, None);
 
-    assert_eq!(settings.tls_private_key_path, None);
-}
+        assert_eq!(settings.tls_public_certificate_path, None);
 
-#[test]
-fn test_settings_env_vars_valid() {
-    env::set_var("JSAAS_TEST_2_BIND_ADDR", "127.0.0.2:1234");
-    env::set_var("JSAAS_TEST_2_SCRIPT_DEFINITION_EXPIRATION_TIME", "5000");
-    env::set_var("JSAAS_TEST_2_SCRIPT_EXECUTION_THREAD_POOL_SIZE", "7");
-    env::set_var("JSAAS_TEST_2_SCRIPT_EXECUTION_COMPLETION_TIME", "1000");
-    env::set_var("JSAAS_TEST_2_TLS_BIND_ADDR", "127.0.0.3:1235");
-    env::set_var("JSAAS_TEST_2_TLS_PUBLIC_CERTIFICATE_PATH", "/root/pub.pem");
-    env::set_var("JSAAS_TEST_2_TLS_PRIVATE_KEY_PATH", "/root/priv.pem");
+        assert_eq!(settings.tls_private_key_path, None);
+    }
 
-    let settings = Settings::new(
-        "JSAAS_TEST_2_BIND_ADDR",
-        "JSAAS_TEST_2_SCRIPT_DEFINITION_EXPIRATION_TIME",
-        "JSAAS_TEST_2_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
-        "JSAAS_TEST_2_SCRIPT_EXECUTION_COMPLETION_TIME",
-        "JSAAS_TEST_2_TLS_BIND_ADDR",
-        "JSAAS_TEST_2_TLS_PUBLIC_CERTIFICATE_PATH",
-        "JSAAS_TEST_2_TLS_PRIVATE_KEY_PATH",
-    )
-    .unwrap();
+    #[test]
+    fn test_settings_env_vars_valid() {
+        env::set_var("JSAAS_TEST_2_BIND_ADDR", "127.0.0.2:1234");
+        env::set_var("JSAAS_TEST_2_SCRIPT_DEFINITION_EXPIRATION_TIME", "5000");
+        env::set_var("JSAAS_TEST_2_SCRIPT_EXECUTION_THREAD_POOL_SIZE", "7");
+        env::set_var("JSAAS_TEST_2_SCRIPT_EXECUTION_COMPLETION_TIME", "1000");
+        env::set_var("JSAAS_TEST_2_TLS_BIND_ADDR", "127.0.0.3:1235");
+        env::set_var("JSAAS_TEST_2_TLS_PUBLIC_CERTIFICATE_PATH", "/root/pub.pem");
+        env::set_var("JSAAS_TEST_2_TLS_PRIVATE_KEY_PATH", "/root/priv.pem");
 
-    assert_eq!(
-        settings.bind_addr,
-        "127.0.0.2:1234".parse::<net::SocketAddr>().unwrap()
-    );
-    assert_eq!(
-        settings.script_definition_expiration_time,
-        time::Duration::from_secs(5)
-    );
-    assert_eq!(
-        settings.script_execution_completion_time,
-        time::Duration::from_secs(1)
-    );
-    assert_eq!(settings.script_execution_thread_pool_size, 7);
+        let settings = Settings::new(
+            "JSAAS_TEST_2_BIND_ADDR",
+            "JSAAS_TEST_2_SCRIPT_DEFINITION_EXPIRATION_TIME",
+            "JSAAS_TEST_2_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
+            "JSAAS_TEST_2_SCRIPT_EXECUTION_COMPLETION_TIME",
+            "JSAAS_TEST_2_TLS_BIND_ADDR",
+            "JSAAS_TEST_2_TLS_PUBLIC_CERTIFICATE_PATH",
+            "JSAAS_TEST_2_TLS_PRIVATE_KEY_PATH",
+        )
+        .unwrap();
 
-    assert_eq!(
-        settings.tls_bind_addr,
-        Some("127.0.0.3:1235".parse::<net::SocketAddr>().unwrap())
-    );
+        assert_eq!(
+            settings.bind_addr,
+            "127.0.0.2:1234".parse::<net::SocketAddr>().unwrap()
+        );
+        assert_eq!(
+            settings.script_definition_expiration_time,
+            time::Duration::from_secs(5)
+        );
+        assert_eq!(
+            settings.script_execution_completion_time,
+            time::Duration::from_secs(1)
+        );
+        assert_eq!(settings.script_execution_thread_pool_size, 7);
 
-    assert_eq!(
-        settings.tls_public_certificate_path,
-        Some(path::Path::new("/root/pub.pem").to_path_buf())
-    );
+        assert_eq!(
+            settings.tls_bind_addr,
+            Some("127.0.0.3:1235".parse::<net::SocketAddr>().unwrap())
+        );
 
-    assert_eq!(
-        settings.tls_private_key_path,
-        Some(path::Path::new("/root/priv.pem").to_path_buf())
-    );
-}
+        assert_eq!(
+            settings.tls_public_certificate_path,
+            Some(path::Path::new("/root/pub.pem").to_path_buf())
+        );
 
-#[test]
-fn test_settings_env_vars_invalid() {
-    env::set_var("JSAAS_TEST_3_BIND_ADDR", "*@!($!");
-    env::set_var("JSAAS_TEST_3_SCRIPT_DEFINITION_EXPIRATION_TIME", "");
-    env::set_var("JSAAS_TEST_3_SCRIPT_EXECUTION_THREAD_POOL_SIZE", "");
-    env::set_var("JSAAS_TEST_3_SCRIPT_EXECUTION_COMPLETION_TIME", "");
+        assert_eq!(
+            settings.tls_private_key_path,
+            Some(path::Path::new("/root/priv.pem").to_path_buf())
+        );
+    }
 
-    assert!(Settings::new(
-        "JSAAS_TEST_3_BIND_ADDR",
-        "JSAAS_TEST_3_SCRIPT_DEFINITION_EXPIRATION_TIME",
-        "JSAAS_TEST_3_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
-        "JSAAS_TEST_3_SCRIPT_EXECUTION_COMPLETION_TIME",
-        "JSAAS_TEST_3_TLS_BIND_ADDR",
-        "JSAAS_TEST_3_TLS_PUBLIC_CERTIFICATE_PATH",
-        "JSAAS_TEST_3_TLS_PRIVATE_KEY_PATH"
-    )
-    .is_err());
+    #[test]
+    fn test_settings_env_vars_invalid() {
+        env::set_var("JSAAS_TEST_3_BIND_ADDR", "*@!($!");
+        env::set_var("JSAAS_TEST_3_SCRIPT_DEFINITION_EXPIRATION_TIME", "");
+        env::set_var("JSAAS_TEST_3_SCRIPT_EXECUTION_THREAD_POOL_SIZE", "");
+        env::set_var("JSAAS_TEST_3_SCRIPT_EXECUTION_COMPLETION_TIME", "");
+
+        assert!(Settings::new(
+            "JSAAS_TEST_3_BIND_ADDR",
+            "JSAAS_TEST_3_SCRIPT_DEFINITION_EXPIRATION_TIME",
+            "JSAAS_TEST_3_SCRIPT_EXECUTION_THREAD_POOL_SIZE",
+            "JSAAS_TEST_3_SCRIPT_EXECUTION_COMPLETION_TIME",
+            "JSAAS_TEST_3_TLS_BIND_ADDR",
+            "JSAAS_TEST_3_TLS_PUBLIC_CERTIFICATE_PATH",
+            "JSAAS_TEST_3_TLS_PRIVATE_KEY_PATH"
+        )
+        .is_err());
+    }
 }

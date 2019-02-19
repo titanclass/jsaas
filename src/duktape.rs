@@ -158,24 +158,27 @@ impl Context {
         };
 
         if result == 0 {
-            // we've successfully executed, so now we encode the result as JSON and obtain a
-            // pointer to it. then, we copy it to a String that is owned by Rust.
-            let json_cstr = unsafe { CStr::from_ptr(duktape::duk_json_encode(self.ctx, 0)) };
+            // we've successfully executed, thus the stack is non-empty. Attempt to
+            // encode it as JSON, and if successful, copy it to an owned String
 
-            let json_string: String = json_cstr
-                .to_str()
-                .map_err(|e| {
-                    self.duk_clear_stack();
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("error encoding Duktape result as JSON: {}", e),
-                    )
-                })?
-                .to_string();
+            let json_ptr = unsafe { duktape::duk_json_encode(self.ctx, 0) };
 
-            self.duk_clear_stack();
+            if json_ptr.is_null() {
+                self.duk_clear_stack();
 
-            Ok(json_string)
+                Err(io::Error::new(io::ErrorKind::Other, "undefined"))
+            } else {
+                let json_cstr = unsafe { CStr::from_ptr(json_ptr) };
+
+                let json_string: String = json_cstr
+                    .to_str()
+                    .map_err(|_e| io::Error::new(io::ErrorKind::Other, "undefined"))?
+                    .to_string();
+
+                self.duk_clear_stack();
+
+                Ok(json_string)
+            }
         } else {
             let error_result = self
                 .duk_error_message()
@@ -238,108 +241,165 @@ impl Drop for Context {
     }
 }
 
-#[test]
-fn test_duktake_add_result_number() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx
-        .evaluate(
-            "function(a, b) { return a + b; }",
-            "[2, 4]",
-            time::Duration::from_millis(5000),
-        )
-        .unwrap();
-    assert_eq!(r, "6");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
 
-#[test]
-fn test_duktake_add_mult_result_obj() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx
-        .evaluate(
+    #[test]
+    fn test_duktake_add_result_number() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate(
+                "function(a, b) { return a + b; }",
+                "[2, 4]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+        assert_eq!(r, "6");
+    }
+
+    #[test]
+    fn test_duktake_add_mult_result_obj() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate(
+                "function(a, b) { return { sum: a + b, product: a * b };}",
+                "[2, 4]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+        assert_eq!(r, "{\"sum\":6,\"product\":8}");
+    }
+
+    #[test]
+    fn test_duktape_bad_code() {
+        let mut ctx = Context::new().unwrap();
+        match ctx.evaluate(
+            "function()) { return 0; }}",
+            "[]",
+            time::Duration::from_millis(5000),
+        ) {
+            Ok(_) => panic!("should have failed"),
+
+            Err(e) => assert_eq!(e.to_string(), "SyntaxError: parse error (line 1)"),
+        };
+    }
+
+    #[test]
+    fn test_duktape_bad_args() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx.evaluate(
             "function(a, b) { return { sum: a + b, product: a * b };}",
-            "[2, 4]",
+            "[{{",
             time::Duration::from_millis(5000),
-        )
-        .unwrap();
-    assert_eq!(r, "{\"sum\":6,\"product\":8}");
-}
+        );
+        match r {
+            Ok(_) => panic!("should have failed"),
 
-#[test]
-fn test_duktape_bad_code() {
-    let mut ctx = Context::new().unwrap();
-    match ctx.evaluate(
-        "function()) { return 0; }}",
-        "[]",
-        time::Duration::from_millis(5000),
-    ) {
-        Ok(_) => panic!("should have failed"),
+            Err(e) => assert_eq!(e.to_string(), "SyntaxError: invalid json (at offset 3)"),
+        };
+    }
 
-        Err(e) => assert_eq!(e.to_string(), "SyntaxError: parse error (line 1)"),
-    };
-}
-
-#[test]
-fn test_duktape_bad_args() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx.evaluate(
-        "function(a, b) { return { sum: a + b, product: a * b };}",
-        "[{{",
-        time::Duration::from_millis(5000),
-    );
-    match r {
-        Ok(_) => panic!("should have failed"),
-
-        Err(e) => assert_eq!(e.to_string(), "SyntaxError: invalid json (at offset 3)"),
-    };
-}
-
-#[test]
-fn test_duktape_wrong_args() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx.evaluate(
-        "function(a, b) { return { sum: a + b, product: a * b };}",
-        " {}",
-        time::Duration::from_millis(5000),
-    );
-    assert!(r.is_err());
-}
-
-#[test]
-fn test_duktape_usable_after_error() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx.evaluate(
-        "funktion()) { return 0; }}",
-        "[]",
-        time::Duration::from_millis(5000),
-    );
-    assert!(r.is_err());
-    let r = ctx
-        .evaluate(
-            "function(a, b) { return a + b; }",
-            "[2, 4]",
+    #[test]
+    fn test_duktape_wrong_args() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx.evaluate(
+            "function(a, b) { return { sum: a + b, product: a * b };}",
+            " {}",
             time::Duration::from_millis(5000),
-        )
-        .unwrap();
-    assert_eq!(r, "6");
-}
+        );
+        assert!(r.is_err());
+    }
 
-#[test]
-fn test_duktake_while_true_recoverable() {
-    let mut ctx = Context::new().unwrap();
-    let r = ctx.evaluate(
-        "function() { while(true) {}",
-        "[]",
-        time::Duration::from_millis(100),
-    );
+    #[test]
+    fn test_duktape_no_return() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate("function() {}", "[]", time::Duration::from_millis(5000))
+            .err()
+            .unwrap();
+        assert_eq!(r.description(), "undefined");
+    }
 
-    assert!(r.is_err());
+    #[test]
+    fn test_duktape_return_undefined() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate(
+                "function() { return undefined; }",
+                "[]",
+                time::Duration::from_millis(5000),
+            )
+            .err()
+            .unwrap();
+        assert_eq!(r.description(), "undefined");
+    }
 
-    let r = ctx
-        .evaluate(
-            "function(a, b) { return a + b; }",
-            "[2, 4]",
+    #[test]
+    fn test_duktape_return_null() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate(
+                "function() { return null; }",
+                "[]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+        assert_eq!(r, "null");
+    }
+
+    #[test]
+    fn test_duktape_return_func() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx
+            .evaluate(
+                "function() { return function() {}; }",
+                "[]",
+                time::Duration::from_millis(5000),
+            )
+            .err()
+            .unwrap();
+        assert_eq!(r.description(), "undefined");
+    }
+
+    #[test]
+    fn test_duktape_usable_after_error() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx.evaluate(
+            "funktion()) { return 0; }}",
+            "[]",
             time::Duration::from_millis(5000),
-        )
-        .unwrap();
-    assert_eq!(r, "6");
+        );
+        assert!(r.is_err());
+        let r = ctx
+            .evaluate(
+                "function(a, b) { return a + b; }",
+                "[2, 4]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+        assert_eq!(r, "6");
+    }
+
+    #[test]
+    fn test_duktake_while_true_recoverable() {
+        let mut ctx = Context::new().unwrap();
+        let r = ctx.evaluate(
+            "function() { while(true) {}",
+            "[]",
+            time::Duration::from_millis(100),
+        );
+
+        assert!(r.is_err());
+
+        let r = ctx
+            .evaluate(
+                "function(a, b) { return a + b; }",
+                "[2, 4]",
+                time::Duration::from_millis(5000),
+            )
+            .unwrap();
+        assert_eq!(r, "6");
+    }
 }
