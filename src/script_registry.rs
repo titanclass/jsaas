@@ -52,81 +52,86 @@ impl ScriptRegistry {
     }
 }
 
-#[test]
-fn test_script_registry_get_none() {
-    let mut registry = ScriptRegistry::new(Duration::from_millis(0));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert!(registry
-        .get(&Uuid::parse_str("50b0cb8f-1f59-4ba5-8935-ba54bb64bc3f").unwrap())
-        .is_none());
+    #[test]
+    fn test_script_registry_get_none() {
+        let mut registry = ScriptRegistry::new(Duration::from_millis(0));
 
-    let script = "function() { return 3 + 4; }";
+        assert!(registry
+            .get(&Uuid::parse_str("50b0cb8f-1f59-4ba5-8935-ba54bb64bc3f").unwrap())
+            .is_none());
 
-    let id = registry.store(script.to_string());
+        let script = "function() { return 3 + 4; }";
 
-    assert_eq!(registry.get(&id), Some(script.to_string()));
-}
+        let id = registry.store(script.to_string());
 
-#[test]
-fn test_script_registry_store_and_get() {
-    let mut registry = ScriptRegistry::new(Duration::from_millis(0));
+        assert_eq!(registry.get(&id), Some(script.to_string()));
+    }
 
-    let script = "function() { return 3 + 4; }";
+    #[test]
+    fn test_script_registry_store_and_get() {
+        let mut registry = ScriptRegistry::new(Duration::from_millis(0));
 
-    let id = registry.store(script.to_string());
+        let script = "function() { return 3 + 4; }";
 
-    assert_eq!(registry.get(&id), Some(script.to_string()));
-}
+        let id = registry.store(script.to_string());
 
-#[test]
-fn test_script_registry_store_and_remove() {
-    let mut registry = ScriptRegistry::new(Duration::from_millis(60000));
+        assert_eq!(registry.get(&id), Some(script.to_string()));
+    }
 
-    let script = "function() { return 3 + 4; }";
+    #[test]
+    fn test_script_registry_store_and_remove() {
+        let mut registry = ScriptRegistry::new(Duration::from_millis(60000));
 
-    let id = registry.store(script.to_string());
+        let script = "function() { return 3 + 4; }";
 
-    registry.remove(&id);
+        let id = registry.store(script.to_string());
 
-    assert_eq!(registry.get(&id), None);
-}
+        registry.remove(&id);
 
-#[test]
-fn test_script_registry_evicts_old_entries() {
-    let mut registry = ScriptRegistry::new(Duration::from_millis(1));
+        assert_eq!(registry.get(&id), None);
+    }
 
-    let script = "function() { return 3 + 4; }";
+    #[test]
+    fn test_script_registry_evicts_old_entries() {
+        let mut registry = ScriptRegistry::new(Duration::from_millis(1));
 
-    let id = registry.store(script.to_string());
+        let script = "function() { return 3 + 4; }";
 
-    // Entries are lazily evicted, so cause eviction by storing a new one
+        let id = registry.store(script.to_string());
 
-    std::thread::sleep(Duration::from_millis(50));
+        // Entries are lazily evicted, so cause eviction by storing a new one
 
-    let _ = registry.store(script.to_string());
+        std::thread::sleep(Duration::from_millis(50));
 
-    // Evicted because of 1ms duration
-    assert_eq!(registry.get(&id), None);
-}
+        let _ = registry.store(script.to_string());
 
-#[test]
-fn test_script_registry_get_extends_eviction() {
-    let mut registry = ScriptRegistry::new(Duration::from_millis(10));
+        // Evicted because of 1ms duration
+        assert_eq!(registry.get(&id), None);
+    }
 
-    let script = "function() { return 3 + 4; }";
+    #[test]
+    fn test_script_registry_get_extends_eviction() {
+        let mut registry = ScriptRegistry::new(Duration::from_millis(10));
 
-    // Since entries are lazily evicted, wait 100ms so that we know
-    // we'd be evicted, get our script, then immediately store one.
-    // We expect to be able to get our original script then, since
-    // getting it extended the eviction time
+        let script = "function() { return 3 + 4; }";
 
-    let id = registry.store(script.to_string());
+        // Since entries are lazily evicted, wait 100ms so that we know
+        // we'd be evicted, get our script, then immediately store one.
+        // We expect to be able to get our original script then, since
+        // getting it extended the eviction time
 
-    std::thread::sleep(Duration::from_millis(100));
+        let id = registry.store(script.to_string());
 
-    let _ = registry.get(&id);
+        std::thread::sleep(Duration::from_millis(100));
 
-    let _ = registry.store(script.to_string());
+        let _ = registry.get(&id);
 
-    assert_eq!(registry.get(&id), Some(script.to_string()));
+        let _ = registry.store(script.to_string());
+
+        assert_eq!(registry.get(&id), Some(script.to_string()));
+    }
 }
