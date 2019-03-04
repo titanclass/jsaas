@@ -4,6 +4,7 @@
 
 #[allow(dead_code)]
 mod duktape {
+    #![allow(clippy::all)]
     include!(concat!(env!("OUT_DIR"), "/duktape-bindings.rs"));
 }
 
@@ -120,7 +121,7 @@ impl Context {
         // if this is not the case, we'd want to initialize a new heap on each call, but
         // this has overheads.
 
-        if !args.as_ref().trim_start().starts_with("[") {
+        if !args.as_ref().trim_start().starts_with('[') {
             // a simple validation hack, given that we require args to be an array, not
             // simply any parseable JSON value
             return Err(io::Error::new(

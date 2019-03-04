@@ -1,10 +1,10 @@
 use num_cpus;
 use std::{env, fmt, io, net, path, time};
 
-const DEFAULT_BIND_ADDR: &'static str = "127.0.0.1:9412";
-const DEFAULT_SCRIPT_DEFINITION_EXPIRATION_TIME: &'static str = "86400000";
-const DEFAULT_SCRIPT_EXECUTION_COMPLETION_TIME: &'static str = "10000";
-const DEFAULT_SCRIPT_EXECUTION_THREAD_POOL_SIZE: &'static str = "0";
+const DEFAULT_BIND_ADDR: &str = "127.0.0.1:9412";
+const DEFAULT_SCRIPT_DEFINITION_EXPIRATION_TIME: &str = "86400000";
+const DEFAULT_SCRIPT_EXECUTION_COMPLETION_TIME: &str = "10000";
+const DEFAULT_SCRIPT_EXECUTION_THREAD_POOL_SIZE: &str = "0";
 
 /// Represents the settings for the program. These are sourced
 /// strictly from environment variables.

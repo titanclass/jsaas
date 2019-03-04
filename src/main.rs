@@ -165,8 +165,8 @@ fn request_handler(
 
                 match maybe_script {
                     Some((id, script)) => {
-                        match method {
-                            &Method::POST => {
+                        match *method {
+                            Method::POST => {
                                 match String::from_utf8(req_body.into_buf().collect()) {
                                     Ok(args) => {
                                         pool.execute(move || {
@@ -205,7 +205,7 @@ fn request_handler(
                                 }
                             }
 
-                            &Method::GET => {
+                            Method::GET => {
                                 let response = Response::builder()
                                     .header("Content-Type", "application/json")
                                     .body(Body::from(script))
@@ -214,7 +214,7 @@ fn request_handler(
                                 sender.send(response).unwrap();
                             }
 
-                            &Method::DELETE => {
+                            Method::DELETE => {
                                 registry.remove(&id);
 
                                 let response =
@@ -502,17 +502,23 @@ fn main() -> io::Result<()> {
         (Some(tls_bind_addr), Some(tls_cert)) => {
             let http_server = setup_http_server(&bind_addr, None)?;
             let https_server = setup_http_server(&tls_bind_addr, Some(tls_cert))?;
-            Ok(tokio::run(
+
+            tokio::run(
                 signal_handler
                     .join(http_server)
                     .join(https_server)
                     .map(|_| ()),
-            ))
+            );
+
+            Ok(())
         }
 
         (_, tls_cert) => {
             let http_server = setup_http_server(&bind_addr, tls_cert)?;
-            Ok(tokio::run(signal_handler.join(http_server).map(|_| ())))
+
+            tokio::run(signal_handler.join(http_server).map(|_| ()));
+
+            Ok(())
         }
     }
 }
