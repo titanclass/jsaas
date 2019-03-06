@@ -5,9 +5,9 @@ extern crate hyper;
 extern crate native_tls;
 extern crate num_cpus;
 extern crate serde_json;
-extern crate threadpool;
 extern crate tokio;
 extern crate tokio_signal;
+extern crate tokio_threadpool;
 extern crate tokio_tls;
 extern crate uuid;
 
@@ -22,22 +22,21 @@ pub(crate) mod script_registry;
 pub(crate) mod settings;
 
 use bytes::*;
-use futures::sync::oneshot;
+use futures::lazy;
+use futures::sync::{mpsc, oneshot};
 use hyper::http::request::Parts;
 use hyper::rt::{Future, Stream};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
-use hyper::{Body, Method, Request, Response};
+use hyper::{Body, Method, Request, Response, StatusCode};
 use native_tls::TlsAcceptor;
 use std::cell::RefCell;
 use std::io::Read;
-use std::sync::mpsc::{channel, Receiver};
-use std::thread;
 use std::thread_local;
 use std::time::Duration;
 use std::{fs, io, net, path, process};
-use threadpool::ThreadPool;
 use tokio::net::TcpListener;
+use tokio_threadpool::Builder;
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -104,51 +103,63 @@ fn json_eval(code: &str, args: &str, limit: Duration) -> io::Result<String> {
 /// If it's a request to define a function, we simply store it
 /// locally in a synchronous fashion and send the reply.
 fn request_handler(
-    rx: Receiver<RequestWithSender>,
+    rx: mpsc::UnboundedReceiver<RequestWithSender>,
     js_thread_pool_size: usize,
     registry_script_ttl: Duration,
     script_execution_completion_time: Duration,
-) {
-    // @FIXME unwraps below should be cleaned up
-    let mut registry = script_registry::ScriptRegistry::new(registry_script_ttl);
-    let pool = ThreadPool::new(js_thread_pool_size);
+) -> Box<Future<Item = (), Error = ()> + Send> {
+    let registry = script_registry::ScriptRegistry::new(registry_script_ttl);
 
-    loop {
+    let pool = Builder::new().pool_size(js_thread_pool_size).build();
+
+    let future = rx.fold((registry, pool), move |state, req_with_sender| {
+        let (mut registry, pool) = state;
         let RequestWithSender {
             req_parts,
             req_body,
             sender,
-        } = rx.recv().unwrap();
+        } = req_with_sender;
+
+        let reply = |response: Option<Response<Body>>| match response {
+            Some(r) => {
+                let _ = sender.send(r);
+            }
+
+            None => {
+                let mut response = Response::new(Body::from("server error"));
+                *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                let _ = sender.send(response);
+            }
+        };
 
         match (req_parts.method, req_parts.uri.path()) {
             (Method::POST, "/execute") => match String::from_utf8(req_body.into_buf().collect()) {
                 Ok(script) => {
-                    pool.execute(move || {
+                    pool.spawn(lazy(move || {
                         let result = json_eval(&script, "[]", script_execution_completion_time);
 
                         let response = match result {
                             Ok(json_body) => Response::builder()
                                 .header("Content-Type", "application/json")
-                                .body(Body::from(json_body))
-                                .unwrap(),
+                                .body(Body::from(json_body)),
 
                             Err(e) => Response::builder()
                                 .status(400)
-                                .body(Body::from(e.to_string()))
-                                .unwrap(),
+                                .body(Body::from(e.to_string())),
                         };
 
-                        sender.send(response).unwrap();
-                    });
+                        reply(response.ok());
+
+                        futures::finished(())
+                    }));
                 }
 
                 Err(_) => {
                     let response = Response::builder()
                         .status(400)
-                        .body(Body::from("cannot extract script from request body"))
-                        .unwrap();
+                        .body(Body::from("cannot extract script from request body"));
 
-                    sender.send(response).unwrap();
+                    reply(response.ok());
                 }
             },
 
@@ -169,7 +180,7 @@ fn request_handler(
                             Method::POST => {
                                 match String::from_utf8(req_body.into_buf().collect()) {
                                     Ok(args) => {
-                                        pool.execute(move || {
+                                        pool.spawn(lazy(move || {
                                             let result = json_eval(
                                                 &script,
                                                 &args,
@@ -179,28 +190,26 @@ fn request_handler(
                                             let response = match result {
                                                 Ok(json_body) => Response::builder()
                                                     .header("Content-Type", "application/json")
-                                                    .body(Body::from(json_body))
-                                                    .unwrap(),
+                                                    .body(Body::from(json_body)),
 
                                                 Err(e) => Response::builder()
                                                     .status(400)
-                                                    .body(Body::from(e.to_string()))
-                                                    .unwrap(),
+                                                    .body(Body::from(e.to_string())),
                                             };
 
-                                            sender.send(response).unwrap();
-                                        });
+                                            reply(response.ok());
+
+                                            futures::finished(())
+                                        }));
                                     }
 
                                     Err(_) => {
-                                        let response = Response::builder()
-                                            .status(400)
-                                            .body(Body::from(
+                                        let response =
+                                            Response::builder().status(400).body(Body::from(
                                                 "cannot extract arguments from request body",
-                                            ))
-                                            .unwrap();
+                                            ));
 
-                                        sender.send(response).unwrap();
+                                        reply(response.ok());
                                     }
                                 }
                             }
@@ -208,19 +217,17 @@ fn request_handler(
                             Method::GET => {
                                 let response = Response::builder()
                                     .header("Content-Type", "application/json")
-                                    .body(Body::from(script))
-                                    .unwrap();
+                                    .body(Body::from(script));
 
-                                sender.send(response).unwrap();
+                                reply(response.ok());
                             }
 
                             Method::DELETE => {
                                 registry.remove(&id);
 
-                                let response =
-                                    Response::builder().status(204).body(Body::empty()).unwrap();
+                                let response = Response::builder().status(204).body(Body::empty());
 
-                                sender.send(response).unwrap();
+                                reply(response.ok());
                             }
 
                             _ => {
@@ -232,10 +239,9 @@ fn request_handler(
                     None => {
                         let response = Response::builder()
                             .status(404)
-                            .body(Body::from("cannot find script"))
-                            .unwrap();
+                            .body(Body::from("cannot find script"));
 
-                        sender.send(response).unwrap();
+                        reply(response.ok());
                     }
                 }
             }
@@ -246,40 +252,46 @@ fn request_handler(
                         let id = registry.store(script);
 
                         let response_body =
-                            serde_json::to_string(&ResponseCreated { id: id.to_string() }).unwrap();
+                            serde_json::to_string(&ResponseCreated { id: id.to_string() })
+                                .unwrap_or_default();
 
                         let response = Response::builder()
                             .status(201)
                             .header("Content-Type", "application/json")
                             .header("Location", format!("/scripts/{}", id))
-                            .body(Body::from(response_body))
-                            .unwrap();
+                            .body(Body::from(response_body));
 
-                        sender.send(response).unwrap();
+                        reply(response.ok());
                     }
 
                     Err(_) => {
                         let response = Response::builder()
                             .status(400)
-                            .body(Body::from("cannot extract script from request body"))
-                            .unwrap();
+                            .body(Body::from("cannot extract script from request body"));
 
-                        sender.send(response).unwrap();
+                        reply(response.ok());
                     }
                 }
             }
 
             (Method::GET, "/ping") => {
                 let response = Response::new(Body::from("pong!"));
-                sender.send(response).unwrap();
+
+                reply(Some(response));
             }
 
             _ => {
-                let response = Response::new(Body::from("cannot find route"));
-                sender.send(response).unwrap();
+                let mut response = Response::new(Body::from("cannot find route"));
+                *response.status_mut() = StatusCode::NOT_FOUND;
+
+                reply(Some(response));
             }
         }
-    }
+
+        futures::finished((registry, pool))
+    });
+
+    Box::new(future.map(|_| ()))
 }
 
 /// Creates a TLS certificate (`Identity`) given PEM formatted public certificate and private key.
@@ -370,8 +382,9 @@ fn main() -> io::Result<()> {
         .map_err(|e| eprintln!("server error: {}", e));
 
     // Setup a channel that is used to send messages from the
-    // Hyper webserver into our request handler thread.
-    let (tx, rx) = channel();
+    // Hyper webserver into our request handler.
+
+    let (tx, rx) = mpsc::unbounded();
 
     let http_proto = Http::new();
 
@@ -408,12 +421,13 @@ fn main() -> io::Result<()> {
                             let tx = tx.clone();
                             let (sender, c) = oneshot::channel::<Response<Body>>();
 
-                            tx.send(RequestWithSender {
+                            tx.unbounded_send(RequestWithSender {
                                 req_parts,
                                 req_body,
                                 sender,
                             })
-                            .unwrap(); // @FIXME
+                            .expect("request_handler has stopped");
+
                             c.map_err(|e| {
                                 std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
                             })
@@ -482,21 +496,21 @@ fn main() -> io::Result<()> {
     let tls_private_key_path = settings.tls_private_key_path.clone();
     let tls_public_certificate_path = settings.tls_public_certificate_path.clone();
 
-    // Spawn our request handler
-    // @TODO use tokio mpsc to save a thread
-    thread::spawn(move || {
-        request_handler(
-            rx,
-            settings.script_execution_thread_pool_size,
-            settings.script_definition_expiration_time,
-            settings.script_execution_completion_time,
-        )
-    });
+    // Get a request handler that holds state and completes requests
+
+    let request_handler = request_handler(
+        rx,
+        settings.script_execution_thread_pool_size,
+        settings.script_definition_expiration_time,
+        settings.script_execution_completion_time,
+    );
 
     let tls_cert = match (tls_private_key_path, tls_public_certificate_path) {
         (Some(private), Some(public)) => Some(create_tls_cert(private, public)?),
         _ => None,
     };
+
+    // Run everything using tokio
 
     match (tls_bind_addr, tls_cert) {
         (Some(tls_bind_addr), Some(tls_cert)) => {
@@ -505,6 +519,7 @@ fn main() -> io::Result<()> {
 
             tokio::run(
                 signal_handler
+                    .join(request_handler)
                     .join(http_server)
                     .join(https_server)
                     .map(|_| ()),
@@ -516,7 +531,12 @@ fn main() -> io::Result<()> {
         (_, tls_cert) => {
             let http_server = setup_http_server(&bind_addr, tls_cert)?;
 
-            tokio::run(signal_handler.join(http_server).map(|_| ()));
+            tokio::run(
+                signal_handler
+                    .join(request_handler)
+                    .join(http_server)
+                    .map(|_| ()),
+            );
 
             Ok(())
         }
