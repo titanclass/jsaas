@@ -52,31 +52,29 @@ jobs:
       - restore_cache:
           key: cargo-cache-1
       - run:
-          name: Commit Version
+          name: Publish
           command: |
             version=$(git describe --tags | sed -E 's/^v//')
+
+            # Update Cargo.toml version specification
             sed "s/^version = \"0.0.1\"$/version = \"$version\"/" Cargo.toml > Cargo.toml.new
             mv Cargo.toml.new Cargo.toml
             git add Cargo.toml
             git config --global user.email "tools@titanclass.com.au"
             git config --global user.name "Titan Class Tools"
             git commit -m "version $version"
-      - run:
-          name: Build & Test
-          command: |
+
+            # Build and test
             cargo build --release --target=x86_64-unknown-linux-musl
             cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast
             cargo test --release --target=x86_64-unknown-linux-musl --no-fail-fast -- --nocapture --ignored
-      - run:
-          name: Docker Publish
-          command: |
+
+            # Publish to DockerHub
             docker login -u "$DOCKER_USERNAME" --password-stdin <<< "$DOCKER_PASSWORD"
-            version=$(git describe --tags | sed -E 's/^v//')
             docker build -t "titanclass/jsaas:$version" .
             docker push "titanclass/jsaas:$version"
-      - run:
-          name: Crates.io Publish
-          command: |
+
+            # Publish to Crates.io
             cargo login <<< "$CRATES_API_KEY"
             cargo publish
       - save_cache:
