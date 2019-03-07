@@ -6,17 +6,28 @@ An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine 
 
 ## Getting Started
 
+### Start with Docker
+
 Using [Docker](https://www.docker.com/), start the service (be sure to replace &lt;version&gt; below):
-
-> You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
-
-### Define and Execute
 
 ```bash
 docker run -e JSAAS_BIND_ADDR=0.0.0.0:9412 -p 9412:9412 --rm -ti titanclass/jsaas:<version>
 ```
 
-Define a program that adds two numbers:
+> You can find the latest version on [DockerHub](https://cloud.docker.com/u/titanclass/repository/docker/titanclass/jsaas/tags)
+
+### Start with Cargo
+
+If you have [Rust](https://www.rust-lang.org/), you can opt to use Cargo instead:
+
+```bash
+cargo install jsaas
+jsaas
+```
+
+### Define and Execute
+
+Now that the JSaaS service is running, define a program that adds two numbers:
 
 ```bash
 curl -XPOST --data 'function(a, b) { return a + b; }' http://localhost:9412/scripts
@@ -101,8 +112,33 @@ A webserver can be started for development:
 cargo run
 ```
 
+## Changelog
+
+### 0.4.0 - 2019-03-07
+
+* Use `futures::sync::mpsc` for better Tokio integration
+* Rust 1.33.0
+* First version published to Crates.io (in addition to DockerHub)
+
+### 0.3.0 - 2019-02-20
+
+* Fix a bug causing a crash if invalid values are returned by supplied JS code.
+* Add `atob`, `btoa` implementations for Base64 support.
+* Use HTTP status 400 where appropriate.
+* Rust 1.32.0
+
+
+### 0.2.0 - 2019-02-04
+
+* Add an `/execute` route that can execute code without saving it.
+
+### 0.1.0 - 2019-01-10
+
+* Initial release.
+
+
 ## Releasing
 
-To release, push a tag that starts with "v" -- e.g. "v0.2.0" -- and CircleCI will build the project and push an image to DockerHub.
+To release, push a tag that starts with "v" -- e.g. "v0.2.0" -- and CircleCI will build the project, push an image to DockerHub, and publish it on Crates.io.
 
 (c)opyright 2019, Titan Class P/L

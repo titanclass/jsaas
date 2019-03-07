@@ -1,6 +1,5 @@
 extern crate bytes;
 extern crate futures;
-extern crate futures_cpupool;
 extern crate hyper;
 extern crate native_tls;
 extern crate num_cpus;
@@ -439,7 +438,11 @@ fn main() -> io::Result<()> {
         // Setup the Hyper webserver (optionally with TLS)
         Ok(match tls_cx {
             Some(tls_cx) => {
-                eprintln!("Server will listen on {} (HTTPS)", bind_addr);
+                eprintln!(
+                    "jsaas {} will listen on {} (HTTPS)",
+                    env!("CARGO_PKG_VERSION"),
+                    bind_addr
+                );
                 Box::new(
                     http_proto
                         .serve_incoming(
@@ -468,7 +471,11 @@ fn main() -> io::Result<()> {
             }
 
             None => {
-                eprintln!("Server will listen on {} (HTTP)", bind_addr);
+                eprintln!(
+                    "jsaas {} will listen on {} (HTTP)",
+                    env!("CARGO_PKG_VERSION"),
+                    bind_addr
+                );
                 Box::new(
                     http_proto
                         .serve_incoming(srv.incoming(), http_handler)
