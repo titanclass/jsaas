@@ -1,5 +1,9 @@
 # JSaaS
 
+[![Crates.io](https://img.shields.io/crates/v/jsaas.svg)](https://crates.io/crates/jsaas)
+[![Crates.io](https://img.shields.io/crates/d/jsaas.svg)](https://crates.io/crates/jsaas)
+[![CircleCI](https://circleci.com/gh/titanclass/jsaas.svg?style=shield)](https://circleci.com/gh/titanclass/jsaas)
+
 ## Overview
 
 An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine to safely execute JavaScript in a sandboxed environment.
