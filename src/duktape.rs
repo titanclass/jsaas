@@ -41,19 +41,59 @@ extern "C" fn jsaas_duk_exec_timeout_check(udata: *mut c_void) -> duktape::duk_b
 }
 
 extern "C" fn jsaas_btoa(ctx: *mut duktape::duk_context) -> duktape::duk_ret_t {
-    unsafe { duktape::duk_base64_encode(ctx, 0) };
+    unsafe { duktape::duk_base64_encode(ctx, -1) };
 
     1
 }
 
 extern "C" fn jsaas_atob(ctx: *mut duktape::duk_context) -> duktape::duk_ret_t {
-    unsafe {
-        duktape::duk_require_string(ctx, 0);
-        duktape::duk_base64_decode(ctx, 0);
-        duktape::duk_buffer_to_string(ctx, 0);
+    let result = unsafe {
+        duktape::duk_require_string(ctx, -1);
+        duktape::duk_base64_decode(ctx, -1);
+
+        // duk_buffer_to_string and duk_push_lstring seem to be doing some
+        // unicode interpretation (or maybe something else) that is causing
+        // bytestrings to be truncated, so as a workaround we push the numeric
+        // values onto the stack and invoke String.fromCharCode to match
+        // typical browser behavior
+
+        let mut buffer_size: duktape::duk_size_t = 0;
+        let buffer_ptr =
+            duktape::duk_get_buffer_data(ctx, -1, &mut buffer_size as *mut duktape::duk_size_t)
+                as *mut i8;
+
+        // these are the only allocations we are doing, so we have
+        // to be careful to ensure that they'll be freed
+        let name_string = CString::new("String").unwrap_or_default().into_raw();
+        let name_from_char_code = CString::new("fromCharCode").unwrap_or_default().into_raw();
+
+        // these cannot fail (barring Duktape bugs) given that the
+        // arguments and stack size are always the same.
+        duktape::duk_get_global_string(ctx, name_string);
+        duktape::duk_get_prop_string(ctx, -1, name_from_char_code);
+
+        // thus, this will always be executed, meaning this code is
+        // leak free
+        drop(CString::from_raw(name_string));
+        drop(CString::from_raw(name_from_char_code));
+
+        // anything past this could fail, but we've already freed
+        // the memory allocated for the `CString`s, so we should be
+        // leak free
+        duktape::duk_dup(ctx, -2);
+
+        for offset in 0..buffer_size {
+            let byte = *(buffer_ptr.offset(offset as isize) as *mut u8) as u32;
+            duktape::duk_push_uint(ctx, byte);
+        }
+
+        duktape::duk_pcall_method(ctx, buffer_size as i32)
     };
 
-    1
+    match result {
+        0 => 1,
+        _ => 0,
+    }
 }
 
 const GLOBAL_FN_BTOA: *const u8 = b"btoa\0" as *const u8;
@@ -466,20 +506,39 @@ mod tests {
 
         let r = ctx
             .evaluate(
-                "
+                r#"
                 function() {
-                    return atob(\"aGVsbG8=\");
+                    return {
+                      one: atob("aGVsbG8="),
+                      two: [0, 1, 2, 3, 4, 5, 6, 7].map(function(i) {
+                        var value = atob("AacABdxfoCQ=");
+
+                        return value.charCodeAt(i);
+                      }),
+                      three: atob("")
+                    };
                 }
-            ",
+                "#,
                 "[]",
                 time::Duration::from_millis(5000),
             )
             .unwrap();
 
-        assert_eq!(r, "\"hello\"");
+        assert_eq!(
+            r,
+            r#"{"one":"hello","two":[1,167,0,5,220,95,160,36],"three":""}"#
+        );
 
         let r = ctx.evaluate(
             "function() { return atob(1234); }",
+            "[]",
+            time::Duration::from_millis(5000),
+        );
+
+        assert!(r.is_err());
+
+        let r = ctx.evaluate(
+            r#"function() { return atob("Z"); }"#,
             "[]",
             time::Duration::from_millis(5000),
         );
