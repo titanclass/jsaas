@@ -118,18 +118,22 @@ cargo run
 
 ## Changelog
 
+### 0.4.1 - 2019-03-29
+
+* Fix a bug in `atob` causing incorrect results for certain inputs.
+
 ### 0.4.0 - 2019-03-07
 
-* Use `futures::sync::mpsc` for better Tokio integration
-* Rust 1.33.0
-* First version published to Crates.io (in addition to DockerHub)
+* Use `futures::sync::mpsc` for better Tokio integration.
+* Rust 1.33.0.
+* First version published to Crates.io (in addition to DockerHub).
 
 ### 0.3.0 - 2019-02-20
 
 * Fix a bug causing a crash if invalid values are returned by supplied JS code.
 * Add `atob`, `btoa` implementations for Base64 support.
 * Use HTTP status 400 where appropriate.
-* Rust 1.32.0
+* Rust 1.32.0.
 
 
 ### 0.2.0 - 2019-02-04
