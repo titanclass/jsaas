@@ -1,0 +1,10 @@
+FROM alpine:latest
+
+RUN mkdir -p /opt/docker/bin
+COPY target/armv7-unknown-linux-musleabihf/release/jsaas /opt/docker/bin/start
+
+FROM scratch
+COPY --from=0 /opt/docker /opt/docker
+WORKDIR /
+ENTRYPOINT ["/opt/docker/bin/start"]
+CMD []

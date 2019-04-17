@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 
 #[allow(dead_code)]
+#[allow(improper_ctypes)]
 mod duktape {
     #![allow(clippy::all)]
     include!(concat!(env!("OUT_DIR"), "/duktape-bindings.rs"));
@@ -127,9 +128,9 @@ impl Context {
         unsafe {
             duktape::duk_push_global_object(ctx);
             duktape::duk_push_c_function(ctx, Some(jsaas_btoa), 1);
-            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_BTOA as *const i8);
+            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_BTOA as *const std::os::raw::c_char);
             duktape::duk_push_c_function(ctx, Some(jsaas_atob), 1);
-            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_ATOB as *const i8);
+            duktape::duk_put_prop_string(ctx, -2, GLOBAL_FN_ATOB as *const std::os::raw::c_char);
             duktape::duk_pop(ctx);
         }
 

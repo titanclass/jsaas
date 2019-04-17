@@ -30,7 +30,7 @@ uuid = { version = "0.7", features = ["v4"] }
 reqwest = "0.9.6"
 
 [build-dependencies]
-bindgen = "0.42.2"
+bindgen = "0.49.0"
 cc = "1.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]

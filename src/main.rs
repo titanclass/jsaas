@@ -19,6 +19,7 @@ extern crate openssl;
 pub(crate) mod duktape;
 pub(crate) mod script_registry;
 pub(crate) mod settings;
+pub(crate) mod shims;
 
 use bytes::*;
 use futures::lazy;
