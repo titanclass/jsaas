@@ -84,6 +84,8 @@ fn main() {
             .collect(),
         );
 
+        let target = env::var("TARGET").expect("missing TARGET");
+
         let bindings = bindgen::Builder::default()
             .header(format!(
                 "{}/duktape-src/duktape.h",
@@ -91,6 +93,7 @@ fn main() {
             ))
             .parse_callbacks(Box::new(ignored_macros))
             .rustfmt_bindings(true)
+            .clang_args(&["-target", &target])
             .blacklist_type("max_align_t")
             .generate()
             .expect("Unable to generate bindings");
