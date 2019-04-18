@@ -10,7 +10,7 @@ An HTTP service that uses the [Duktape](https://duktape.org/) JavaScript engine 
 
 ## Getting Started
 
-### Start with Docker
+### Start with Docker (AMD64/ARM)
 
 Using [Docker](https://www.docker.com/), start the service (be sure to replace &lt;version&gt; below):
 
@@ -117,6 +117,10 @@ cargo run
 ```
 
 ## Changelog
+
+### 0.5.0 - 2019-04-18
+
+* JSaaS is now published to DockerHub for both AMD64 and ARM architectures.
 
 ### 0.4.1 - 2019-03-29
 
